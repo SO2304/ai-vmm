@@ -178,3 +178,7 @@ and the Kani proofs on Linux — on every push and pull request.
 ## License
 
 MIT — see [LICENSE](LICENSE).
+
+## Contact
+Questions, feedback, or consulting inquiries:
+**Souhayb Rharrab** — souhaybrharrab@gmail.com
