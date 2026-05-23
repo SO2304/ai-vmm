@@ -1,0 +1,57 @@
+[package]
+name = "ai-vmm"
+version = "0.1.0"
+edition = "2021"
+description = "Agentic Hypervisor — native KVM control plane driven by Claude"
+license = "MIT"
+readme = "README.md"
+
+[[bin]]
+name = "ai-vmm"
+path = "src/main.rs"
+
+[dependencies]
+tokio = { version = "1", features = ["full"] }
+reqwest = { version = "0.11", features = ["json"] }
+# axum HTTP server for the `ai-vmm serve` control-plane API. Pure, cross-platform
+# Rust; the planning and ledger endpoints run on every OS.
+axum = "0.7"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+clap = { version = "4.4", features = ["derive"] }
+directories = "5.0"
+toml = "0.8"
+# Reads the API key from the terminal with echo disabled, so the secret never
+# appears on screen or in the terminal scrollback.
+rpassword = "7"
+# Ctrl+C handling for the VMM run loop, so the hypervisor shuts down cleanly
+# (and removes its host TAP interface) instead of leaving it orphaned.
+ctrlc = "3"
+
+# The KVM APIs are only available on Linux. These dependencies are compiled
+# and linked for Linux targets only: on other systems (Windows, macOS) the
+# crate still builds, but provisioning returns an explicit error.
+[target.'cfg(target_os = "linux")'.dependencies]
+kvm-ioctls = "0.13.0"
+kvm-bindings = "0.6.0"
+# `backend-mmap` exposes `GuestMemoryMmap` (mmap-based memory allocation),
+# which the native KVM provisioning path requires. Pinned to 0.14 so the whole
+# dependency graph (including `linux-loader`) shares a single `vm-memory`.
+vm-memory = { version = "0.14", features = ["backend-mmap"] }
+# rust-vmm's standard Linux kernel loader (Direct Kernel Boot). The `elf`
+# feature enables the `vmlinux` ELF loader used by `boot::load_kernel`.
+linux-loader = { version = "0.11.0", features = ["elf"] }
+# `EventFd` for the virtio-blk irqfd. Pinned to 0.11 — the version `kvm-ioctls`
+# 0.13 itself uses — so the `EventFd` type matches what `register_irqfd`
+# expects (0.12 would pull a second, incompatible copy).
+vmm-sys-util = "0.11"
+
+# Registers `cfg(kani)` as a known compilation condition: the proof harnesses
+# in `src/vmm/mod.rs` and `src/config.rs` are only compiled by the Kani model
+# checker.
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(kani)'] }
+
+[profile.release]
+lto = true
+codegen-units = 1

@@ -1,0 +1,64 @@
+name: CI
+
+# Verifies every push and pull request against the project's quality baseline
+# (CLAUDE.md section 8): strict Clippy, formatting, and the full test suite on
+# Linux and Windows, plus the Kani formal proofs on Linux. A failure here is
+# meant to block the merge.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: fmt + clippy + test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install the Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      - name: Formatting
+        run: cargo fmt --check
+
+      - name: Clippy (strict — zero warnings)
+        run: cargo clippy --all-targets -- -D warnings
+
+      # The live OS-boot integration test skips cleanly when ./vmlinux and
+      # ./rootfs.ext4 are absent (they are not committed), so the suite runs
+      # unchanged whether or not the runner exposes /dev/kvm.
+      - name: Tests
+        run: cargo test
+
+  kani:
+    name: cargo kani (formal proofs)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install the Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install Kani
+        run: cargo install --locked kani-verifier
+
+      - name: Set up Kani
+        run: cargo kani setup
+
+      - name: Verify the proof harnesses
+        run: cargo kani
